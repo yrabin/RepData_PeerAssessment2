@@ -8,11 +8,11 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
 
-<meta name="author" content="Vignette Author" />
+<meta name="author" content="Reproducible Research - Peer Assessment 2" />
 
 <meta name="date" content="2014-12-14" />
 
-<title>Severe Weather Events Impact</title>
+<title>Severe Weather Impacts</title>
 
 
 
@@ -52,8 +52,8 @@ code > span.er { color: #ff0000; font-weight: bold; }
 
 
 <div id="header">
-<h1 class="title">Severe Weather Events Impact</h1>
-<h4 class="author"><em>Vignette Author</em></h4>
+<h1 class="title">Severe Weather Impacts</h1>
+<h4 class="author"><em>Reproducible Research - Peer Assessment 2</em></h4>
 <h4 class="date"><em>2014-12-14</em></h4>
 </div>
 
@@ -64,12 +64,163 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li>Has a smaller default figure size</li>
 <li>Uses a custom CSS stylesheet instead of the default Twitter Bootstrap style</li>
 </ul>
-<div id="vignette-info" class="section level2">
-<h2>Vignette Info</h2>
+<p>Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.</p>
+<p>This project involves exploring the U.S. National Oceanic and Atmospheric Administration’s (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.</p>
+<p>The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.</p>
+<p>The basic goal of this assignment is to explore the NOAA Storm Database and answer some basic questions about severe weather events. 1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health? 2. Across the United States, which types of events have the greatest economic consequences?</p>
+<p>The report were to be read by a government or municipal manager who might be responsible for preparing for severe weather events and will need to prioritize resources for different types of events. However, no need any specific recommendations in report.</p>
+<div id="data-processing" class="section level2">
+<h2>Data Processing</h2>
 <p>Note the various macros within the <code>vignette</code> setion of the metadata block above. These are required in order to instruct R how to build the vignette. Note that you should change the <code>title</code> field and the <code>\VignetteIndexEntry</code> to match the title of your vignette.</p>
+<pre class="sourceCode r"><code class="sourceCode r">storm_data &lt;-<span class="st"> </span><span class="kw">read.csv</span>(<span class="kw">bzfile</span>(<span class="st">'repdata_data_StormData.csv.bz2'</span>))
+<span class="kw">str</span>(storm_data)</code></pre>
+<pre><code>## 'data.frame':    902297 obs. of  37 variables:
+##  $ STATE__   : num  1 1 1 1 1 1 1 1 1 1 ...
+##  $ BGN_DATE  : Factor w/ 16335 levels &quot;10/10/1954 0:00:00&quot;,..: 6523 6523 4213 11116 1426 1426 1462 2873 3980 3980 ...
+##  $ BGN_TIME  : Factor w/ 3608 levels &quot;000&quot;,&quot;0000&quot;,&quot;00:00:00 AM&quot;,..: 212 257 2645 1563 2524 3126 122 1563 3126 3126 ...
+##  $ TIME_ZONE : Factor w/ 22 levels &quot;ADT&quot;,&quot;AKS&quot;,&quot;AST&quot;,..: 7 7 7 7 7 7 7 7 7 7 ...
+##  $ COUNTY    : num  97 3 57 89 43 77 9 123 125 57 ...
+##  $ COUNTYNAME: Factor w/ 29601 levels &quot;&quot;,&quot;5NM E OF MACKINAC BRIDGE TO PRESQUE ISLE LT MI&quot;,..: 13513 1873 4598 10592 4372 10094 1973 23873 24418 4598 ...
+##  $ STATE     : Factor w/ 72 levels &quot;AK&quot;,&quot;AL&quot;,&quot;AM&quot;,..: 2 2 2 2 2 2 2 2 2 2 ...
+##  $ EVTYPE    : Factor w/ 985 levels &quot;?&quot;,&quot;ABNORMALLY DRY&quot;,..: 830 830 830 830 830 830 830 830 830 830 ...
+##  $ BGN_RANGE : num  0 0 0 0 0 0 0 0 0 0 ...
+##  $ BGN_AZI   : Factor w/ 35 levels &quot;&quot;,&quot;E&quot;,&quot;Eas&quot;,&quot;EE&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ BGN_LOCATI: Factor w/ 54429 levels &quot;&quot;,&quot;?&quot;,&quot;(01R)AFB GNRY RNG AL&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ END_DATE  : Factor w/ 6663 levels &quot;&quot;,&quot;10/10/1993 0:00:00&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ END_TIME  : Factor w/ 3647 levels &quot;&quot;,&quot;?&quot;,&quot;0000&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ COUNTY_END: num  0 0 0 0 0 0 0 0 0 0 ...
+##  $ COUNTYENDN: logi  NA NA NA NA NA NA ...
+##  $ END_RANGE : num  0 0 0 0 0 0 0 0 0 0 ...
+##  $ END_AZI   : Factor w/ 24 levels &quot;&quot;,&quot;E&quot;,&quot;ENE&quot;,&quot;ESE&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ END_LOCATI: Factor w/ 34506 levels &quot;&quot;,&quot;(0E4)PAYSON ARPT&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ LENGTH    : num  14 2 0.1 0 0 1.5 1.5 0 3.3 2.3 ...
+##  $ WIDTH     : num  100 150 123 100 150 177 33 33 100 100 ...
+##  $ F         : int  3 2 2 2 2 2 2 1 3 3 ...
+##  $ MAG       : num  0 0 0 0 0 0 0 0 0 0 ...
+##  $ FATALITIES: num  0 0 0 0 0 0 0 0 1 0 ...
+##  $ INJURIES  : num  15 0 2 2 2 6 1 0 14 0 ...
+##  $ PROPDMG   : num  25 2.5 25 2.5 2.5 2.5 2.5 2.5 25 25 ...
+##  $ PROPDMGEXP: Factor w/ 19 levels &quot;&quot;,&quot;-&quot;,&quot;?&quot;,&quot;+&quot;,..: 17 17 17 17 17 17 17 17 17 17 ...
+##  $ CROPDMG   : num  0 0 0 0 0 0 0 0 0 0 ...
+##  $ CROPDMGEXP: Factor w/ 9 levels &quot;&quot;,&quot;?&quot;,&quot;0&quot;,&quot;2&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ WFO       : Factor w/ 542 levels &quot;&quot;,&quot;2&quot;,&quot;43&quot;,&quot;9V9&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ STATEOFFIC: Factor w/ 250 levels &quot;&quot;,&quot;ALABAMA, Central&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ ZONENAMES : Factor w/ 25112 levels &quot;&quot;,&quot;                                                                                                                               &quot;| __truncated__,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ LATITUDE  : num  3040 3042 3340 3458 3412 ...
+##  $ LONGITUDE : num  8812 8755 8742 8626 8642 ...
+##  $ LATITUDE_E: num  3051 0 0 0 0 ...
+##  $ LONGITUDE_: num  8806 0 0 0 0 ...
+##  $ REMARKS   : Factor w/ 436781 levels &quot;&quot;,&quot; &quot;,&quot;  &quot;,&quot;   &quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ REFNUM    : num  1 2 3 4 5 6 7 8 9 10 ...</code></pre>
+<pre class="sourceCode r"><code class="sourceCode r"><span class="kw">head</span>(storm_data,<span class="dv">20</span>)</code></pre>
+<pre><code>##    STATE__           BGN_DATE BGN_TIME TIME_ZONE COUNTY COUNTYNAME STATE
+## 1        1  4/18/1950 0:00:00     0130       CST     97     MOBILE    AL
+## 2        1  4/18/1950 0:00:00     0145       CST      3    BALDWIN    AL
+## 3        1  2/20/1951 0:00:00     1600       CST     57    FAYETTE    AL
+## 4        1   6/8/1951 0:00:00     0900       CST     89    MADISON    AL
+## 5        1 11/15/1951 0:00:00     1500       CST     43    CULLMAN    AL
+## 6        1 11/15/1951 0:00:00     2000       CST     77 LAUDERDALE    AL
+## 7        1 11/16/1951 0:00:00     0100       CST      9     BLOUNT    AL
+## 8        1  1/22/1952 0:00:00     0900       CST    123 TALLAPOOSA    AL
+## 9        1  2/13/1952 0:00:00     2000       CST    125 TUSCALOOSA    AL
+## 10       1  2/13/1952 0:00:00     2000       CST     57    FAYETTE    AL
+## 11       1  2/13/1952 0:00:00     2030       CST     43    CULLMAN    AL
+## 12       1  2/13/1952 0:00:00     2030       CST      9     BLOUNT    AL
+## 13       1  2/13/1952 0:00:00     2130       CST     73  JEFFERSON    AL
+## 14       1  2/29/1952 0:00:00     1700       CST     49     DEKALB    AL
+## 15       1   3/3/1952 0:00:00     1310       CST    107    PICKENS    AL
+## 16       1  3/22/1952 0:00:00     1500       CST    103     MORGAN    AL
+## 17       1   4/4/1952 0:00:00     0620       CST     97     MOBILE    AL
+## 18       1  5/10/1952 0:00:00     0900       CST     57    FAYETTE    AL
+## 19       1  5/10/1952 0:00:00     0900       CST     57    FAYETTE    AL
+## 20       1  5/10/1952 0:00:00     0900       CST     57    FAYETTE    AL
+##     EVTYPE BGN_RANGE BGN_AZI BGN_LOCATI END_DATE END_TIME COUNTY_END
+## 1  TORNADO         0                                               0
+## 2  TORNADO         0                                               0
+## 3  TORNADO         0                                               0
+## 4  TORNADO         0                                               0
+## 5  TORNADO         0                                               0
+## 6  TORNADO         0                                               0
+## 7  TORNADO         0                                               0
+## 8  TORNADO         0                                               0
+## 9  TORNADO         0                                               0
+## 10 TORNADO         0                                               0
+## 11 TORNADO         0                                               0
+## 12 TORNADO         0                                               0
+## 13 TORNADO         0                                               0
+## 14 TORNADO         0                                               0
+## 15 TORNADO         0                                               0
+## 16 TORNADO         0                                               0
+## 17 TORNADO         0                                               0
+## 18 TORNADO         0                                               0
+## 19 TORNADO         0                                               0
+## 20 TORNADO         0                                               0
+##    COUNTYENDN END_RANGE END_AZI END_LOCATI LENGTH WIDTH F MAG FATALITIES
+## 1          NA         0                      14.0   100 3   0          0
+## 2          NA         0                       2.0   150 2   0          0
+## 3          NA         0                       0.1   123 2   0          0
+## 4          NA         0                       0.0   100 2   0          0
+## 5          NA         0                       0.0   150 2   0          0
+## 6          NA         0                       1.5   177 2   0          0
+## 7          NA         0                       1.5    33 2   0          0
+## 8          NA         0                       0.0    33 1   0          0
+## 9          NA         0                       3.3   100 3   0          1
+## 10         NA         0                       2.3   100 3   0          0
+## 11         NA         0                       1.3   400 1   0          0
+## 12         NA         0                       4.7   400 1   0          0
+## 13         NA         0                       0.0   200 3   0          1
+## 14         NA         0                       3.3   400 3   0          0
+## 15         NA         0                       3.3   440 3   0          0
+## 16         NA         0                      21.6   100 4   0          4
+## 17         NA         0                       0.2   200 1   0          0
+## 18         NA         0                       0.2    50 1   0          0
+## 19         NA         0                       0.2    50 1   0          0
+## 20         NA         0                       0.2    50 1   0          0
+##    INJURIES PROPDMG PROPDMGEXP CROPDMG CROPDMGEXP WFO STATEOFFIC ZONENAMES
+## 1        15    25.0          K       0                                    
+## 2         0     2.5          K       0                                    
+## 3         2    25.0          K       0                                    
+## 4         2     2.5          K       0                                    
+## 5         2     2.5          K       0                                    
+## 6         6     2.5          K       0                                    
+## 7         1     2.5          K       0                                    
+## 8         0     2.5          K       0                                    
+## 9        14    25.0          K       0                                    
+## 10        0    25.0          K       0                                    
+## 11        3     2.5          M       0                                    
+## 12        3     2.5          M       0                                    
+## 13       26   250.0          K       0                                    
+## 14       12     0.0          K       0                                    
+## 15        6    25.0          K       0                                    
+## 16       50    25.0          K       0                                    
+## 17        2    25.0          K       0                                    
+## 18        0    25.0          K       0                                    
+## 19        0    25.0          K       0                                    
+## 20        0    25.0          K       0                                    
+##    LATITUDE LONGITUDE LATITUDE_E LONGITUDE_ REMARKS REFNUM
+## 1      3040      8812       3051       8806              1
+## 2      3042      8755          0          0              2
+## 3      3340      8742          0          0              3
+## 4      3458      8626          0          0              4
+## 5      3412      8642          0          0              5
+## 6      3450      8748          0          0              6
+## 7      3405      8631          0          0              7
+## 8      3255      8558          0          0              8
+## 9      3334      8740       3336       8738              9
+## 10     3336      8738       3337       8737             10
+## 11     3401      8645       3402       8644             11
+## 12     3402      8644       3404       8640             12
+## 13     3336      8656          0          0             13
+## 14     3430      8542       3432       8540             14
+## 15     3320      8754       3322       8752             15
+## 16     3436      8700       3441       8638             16
+## 17     3042      8817          0          0             17
+## 18     3344      8745          0          0             18
+## 19     3344      8745          0          0             19
+## 20     3344      8745          0          0             20</code></pre>
 </div>
-<div id="styles" class="section level2">
-<h2>Styles</h2>
+<div id="results" class="section level2">
+<h2>Results</h2>
 <p>The <code>html_vignette</code> template includes a basic CSS theme. To override this theme you can specify your own CSS in the document metadata as follows:</p>
 <pre><code>output: 
   rmarkdown::html_vignette:
@@ -254,6 +405,14 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <blockquote>
 <p>“He who gives up [code] safety for [code] speed deserves neither.” (<a href="https://twitter.com/hadleywickham/status/504368538874703872">via</a>)</p>
 </blockquote>
+</div>
+<div id="references" class="section level2">
+<h2>References</h2>
+<ol style="list-style-type: decimal">
+<li>U.S. National Oceanic and Atmospheric Administration’s (NOAA) storm <a href="https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2">database</a></li>
+<li>National Weather Service Storm Data <a href="https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf">Documentation</a></li>
+<li>National Climatic Data Center Storm Events <a href="https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf">FAQ</a></li>
+</ol>
 </div>
 <div class="footnotes">
 <hr />
