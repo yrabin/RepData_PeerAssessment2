@@ -9,76 +9,228 @@ vignette: >
   \usepackage[utf8]{inputenc}
 ---
 
-Vignettes are long form documentation commonly included in packages. Because they are part of the distribution of the package, they need to be as compact as possible. The `html_vignette` output type provides a custom style sheet (and tweaks some options) to ensure that the resulting html is as small as possible. The `html_vignette` format:
-
-- Never uses retina figures
-- Has a smaller default figure size
-- Uses a custom CSS stylesheet instead of the default Twitter Bootstrap style
-
 Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
 
 This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
 
-The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+The basic goal of this assignment is to explore the NOAA Storm Database and answer some basic questions about severe weather events: 
+<br>1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population **health**?
+<br>2. Across the United States, which types of events have the greatest **economic** consequences?
 
-The basic goal of this assignment is to explore the NOAA Storm Database and answer some basic questions about severe weather events. 
-1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
-2. Across the United States, which types of events have the greatest economic consequences?
+The report were to be read by a government or municipal manager who might be responsible for preparing for severe weather events and will need to prioritize resources for different types of events. However, no specific recommendations is needed in this report.
 
-The report were to be read by a government or municipal manager who might be responsible for preparing for severe weather events and will need to prioritize resources for different types of events. However, no need any specific recommendations in report.
 
 ## Data Processing
 
-Note the various macros within the `vignette` setion of the metadata block above. These are required in order to instruct R how to build the vignette. Note that you should change the `title` field and the `\VignetteIndexEntry` to match the title of your vignette.
+The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
 
+The data loading process is described in R code below:
+
+##### Load the Data
 ```{r loaddata, cache=TRUE}
 storm_data <- read.csv(bzfile('repdata_data_StormData.csv.bz2'))
 str(storm_data)
-head(storm_data,20)
+head(storm_data)
 ```
 
+##### Variables of Interest
+For this analysis, the grouping of impact is based on `EVTYPE` (Event Type) i.e. the name of severe weather event.
+
+Variables related to **Health** impacts are:
+<br>- `FATALITIES` : number of fatalities
+<br>- `INJURIES`   : number of injuries
+
+
+Variables related to **Economic** impacts are:
+<br>- `PROPDMG`    : value of properties damage
+<br>- `PROPDMGEXP` : unit of the value for the above properties damage
+<br>- `CROPDMG`    : value of crops damage
+<br>- `CROPDMGEXP` : unit of the value for the above crops damage
+
+* *the units (`PROPDMGEXP`, `CROPDMGEXP`) are expressed as follow:*
+<br>- 'H'/'h' ..means the value in hundreds
+<br>- 'K'/'k' ..means the value in thousands
+<br>- 'M'/'m' ..means the value in millions
+<br>- 'B'/'b' ..means the value in billions
+
+
+##### Refining Event Names
+There are duplicates of events that are counted separately due to likely typo or incosistencies in naming, such as:
+<br>- `COASTAL STORM` and `COASTALSTORM`
+<br>- `FLASH FLOODS` and `FLASH FLOOD`
+<br>- `HEAT WAVES` and `HEAT WAVE`
+<br>- etc
+
+For handling the above, simple Levenshtein algorithm is implemented to correct **some** of these incosistencies. A value of 3 is used for threshold to capture inconsistencies due to typo and plural as above.
+
+```{r}
+lv <- function(events) {
+  distance_events <- adist(events$EVTYPE, events$EVTYPE)
+  similar_events <- which((distance_events!=0) & (distance_events<3), arr.ind=TRUE)
+
+
+  for(i in 1:nrow(similar_events)) {
+    earlier = min(similar_events[i,'row'],similar_events[i,'col'])
+    later   = max(similar_events[i,'row'],similar_events[i,'col'])
+  
+    #print(paste(paste(events[later,'EVTYPE'],' >> '),events[earlier,'EVTYPE']))
+
+    events[later,'EVTYPE'] <- events[earlier,'EVTYPE']
+  }
+  
+  events[,'EVTYPE']
+}
+```
+
+There could be unwanted changes from the above refinement method - especially 4 letter words (as the threshold used is 3) and sub-grouping (e.g. `TSTM WIND (G40)` and `TSTM WIND (G35)` are grouped together in the later). We need to keep this in mind and drill futher if the final result of top events warrant it (i.e. possibility of incorrect grouping).
+
+
+## Analysis
+
+
+##### Health
+```{r, cache=TRUE}
+#subsetting Health variables
+storm_health <- storm_data[,c('EVTYPE', 'FATALITIES', 'INJURIES')]
+
+#subsetting events with non-zero impacts
+storm_health <- subset(storm_health, FATALITIES + INJURIES != 0)
+
+#aggregate based on EVTYPE
+storm_health <- aggregate(cbind(FATALITIES, INJURIES)~toupper(EVTYPE), data=storm_health, sum)
+names(storm_health) <- c('EVTYPE','FATALITIES','INJURIES')
+
+#refinement -- the above aggregate is done to make refinement faster
+storm_health$EVTYPE <- lv(storm_health)
+
+#aggregate based on EVTYPE -- the first aggregate was only to make refinement faster
+storm_health <- aggregate(cbind(FATALITIES, INJURIES)~EVTYPE, data=storm_health, sum)
+```
+
+**Top 10 Events resulting in Fatalities:**
+```{r}
+knitr::kable(head(storm_health[order(storm_health$FATALITIES, decreasing=T),c(1,2)], 10))
+```
+
+**Top 10 Events resulting in Injuries:**
+```{r}
+knitr::kable(head(storm_health[order(storm_health$INJURIES, decreasing=T),c(1,3)], 10))
+```
+
+
+
+##### Economic
+The following helper function is used to calculate **Total Damage** to Properties and Crops:
+```{r}
+caldmg <- function(value, unit) {
+  if((value<0) | (value>9))
+    return(0)
+  
+  if('H' == toupper(unit)) {
+    return(as.numeric(value)*(10^2)) # hundred
+  }
+  else if('K' == toupper(unit)) {
+    return(as.numeric(value)*(10^3)) # thousand
+  }
+  else if('M' == toupper(unit)) {
+    return(as.numeric(value)*(10^6)) # million
+  }
+  else if('B' == toupper(unit)) {
+    return(as.numeric(value)*(10^9)) # billion
+  }
+  
+  return(as.numeric(value))
+}
+```
+
+Two helper variables are created to calculate Total Damage:
+<br>- `PROPTOTDMG` : total properties damage, calculated from `PROPDMG` (value) and `PROPDMGEXP` (unit)
+<br>- `CROPTOTDMG` : total properties damage, calculated from `CROPDMG` (value) and `CROPDMGEXP` (unit)
+
+```{r, cache=TRUE}
+#subsetting Economic variables
+storm_econ <- storm_data[,c('EVTYPE', 'PROPDMG', 'PROPDMGEXP', 'CROPDMG', 'CROPDMGEXP')]
+
+#calculate Total Damage
+storm_econ$PROPTOTDMG <- apply(storm_econ, 1, function(x) caldmg(x['PROPDMG'], x['PROPDMGEXP']))
+storm_econ$CROPTOTDMG <- apply(storm_econ, 1, function(x) caldmg(x['CROPDMG'], x['CROPDMGEXP']))
+
+#subsetting events with non-zero impacts
+storm_econ <- storm_econ[,c('EVTYPE', 'PROPTOTDMG', 'CROPTOTDMG')]
+storm_econ <- subset(storm_econ, PROPTOTDMG + CROPTOTDMG != 0)
+
+#aggregate based on EVTYPE
+storm_econ <- aggregate(cbind(PROPTOTDMG, CROPTOTDMG)~toupper(EVTYPE), data=storm_econ, sum)
+names(storm_econ) <- c('EVTYPE','PROPTOTDMG','CROPTOTDMG')
+
+#refinement -- the above aggregate is done to make refinement faster
+storm_econ$EVTYPE <- lv(storm_econ)
+
+#aggregate based on EVTYPE -- the first aggregate was only to make refinement faster
+storm_econ <- aggregate(cbind(PROPTOTDMG, CROPTOTDMG)~EVTYPE, data=storm_econ, sum)
+```
+
+**Top 10 Events damaging Properties:**
+```{r}
+knitr::kable(head(storm_econ[order(storm_econ$PROPTOTDMG, decreasing=T),c(1,2)], 10))
+```
+
+**Top 10 Events damaging Crops:**
+```{r}
+knitr::kable(head(storm_econ[order(storm_econ$CROPTOTDMG, decreasing=T),c(1,3)], 10))
+```
 
 ## Results
 
-The `html_vignette` template includes a basic CSS theme. To override this theme you can specify your own CSS in the document metadata as follows:
+Combining the impacts to **Health** (i.e. both Fatalities and Injuries), **Tornado** is by far the most damaging weather events. For **Economic** impacts, combining damages to Properties and Crop, **Flood** is the most damaging (although, **Drought** causes the most damage to crops with Flood comes in second).
 
-    output: 
-      rmarkdown::html_vignette:
-        css: mystyles.css
+The above combined impacts are summarized in the two plots below:
 
-## Figures
+```{r, fig.width=7, fig.height=7}
+library(reshape2)
+library(ggplot2)
 
-The figure sizes have been customised so that you can easily put two images side-by-side. 
 
-```{r, fig.show='hold'}
-plot(1:10)
-plot(10:1)
+# HEALTH
+##########################################
+#extract Top 10,
+top_storm_health <- head(storm_health[with(storm_health,order(FATALITIES+INJURIES, decreasing=T)),], 10)
+
+#re-order for ggplot2
+top_storm_health$EVTYPE <- factor(top_storm_health$EVTYPE, levels=top_storm_health[,'EVTYPE'])
+
+#plot!
+ggplot(data=melt(top_storm_health, id.var='EVTYPE'), aes(x=EVTYPE, y=value, fill=variable)) + 
+  geom_bar(stat='identity') +
+  xlab('Weather Events') +  ylab('Total Causalities') +
+  theme(axis.text.x=element_text(angle=50)) +
+  scale_y_continuous(breaks=seq(0,100000,5000)) +
+  scale_fill_discrete(name='Causality Type', labels=c('Fatalities', 'Injuries')) +
+  ggtitle('Health Impacts from Severe Weather')
 ```
 
-You can enable figure captions by `fig_caption: yes` in YAML:
+```{r, fig.width=7, fig.height=7}
+# ECONOMIC
+##########################################
+#extract Top 10,
+top_storm_econ <- head(storm_econ[with(storm_econ,order(PROPTOTDMG+CROPTOTDMG, decreasing=T)),], 10)
 
-    output:
-      rmarkdown::html_vignette:
-        fig_caption: yes
+#re-order for ggplot2
+top_storm_econ$EVTYPE <- factor(top_storm_econ$EVTYPE, levels=top_storm_econ[,'EVTYPE'])
 
-Then you can use the chunk option `fig.cap = "Your figure caption."` in **knitr**.
-
-## More Examples
-
-You can write math expressions, e.g. $Y = X\beta + \epsilon$, footnotes^[A footnote here.], and tables, e.g. using `knitr::kable()`.
-
-```{r, echo=FALSE, results='asis'}
-knitr::kable(head(mtcars, 10))
+#plot!
+ggplot(data=melt(top_storm_econ, id.var='EVTYPE'), aes(x=EVTYPE, y=(value/(10^9)), fill=variable)) + 
+  geom_bar(stat='identity') +
+  xlab('Weather Events') +  ylab('Total Damages (in Billions)') +
+  theme(axis.text.x=element_text(angle=50)) +
+  scale_y_continuous(breaks=seq(0,200,10)) +
+  scale_fill_discrete(name='Damage Type', labels=c('Properties', 'Crops')) +
+  ggtitle('Economic Impacts from Severe Weather')
 ```
-
-Also a quote using `>`:
-
-> "He who gives up [code] safety for [code] speed deserves neither."
-([via](https://twitter.com/hadleywickham/status/504368538874703872))
 
 
 ## References
 1. U.S. National Oceanic and Atmospheric Administration's (NOAA) storm [database](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2)
 2. National Weather Service Storm Data [Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
 3. National Climatic Data Center Storm Events [FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)
-
+4. National Climatic Data Center Strom Events [Database](http://www.ncdc.noaa.gov/stormevents/ftp.jsp)
